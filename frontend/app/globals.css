@@ -1,0 +1,184 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* DPBD Color Theme - Exact colors from provided palette:
+   - Bright Red: #B30000 - For alerts, destructive, CTA
+   - Gold/Cream: #D4C896 - Secondary/accent, highlights
+   - Dark Maroon: #5C1515 - Primary brand color
+   - Olive Green: #6B6B4B - Muted/neutral, success
+   - Black: #0A0A0A - Dark backgrounds, sidebar
+*/
+:root {
+  --background: #fafaf8;
+  --foreground: #0a0a0a;
+  --card: #ffffff;
+  --card-foreground: #0a0a0a;
+  --popover: #ffffff;
+  --popover-foreground: #0a0a0a;
+  /* Primary: Dark Maroon #5C1515 */
+  --primary: #5c1515;
+  --primary-foreground: #ffffff;
+  /* Secondary: Gold/Cream #D4C896 */
+  --secondary: #d4c896;
+  --secondary-foreground: #0a0a0a;
+  /* Muted: Olive-tinted */
+  --muted: #f0ede6;
+  --muted-foreground: #6b6b4b;
+  /* Accent: Gold/Cream #D4C896 */
+  --accent: #d4c896;
+  --accent-foreground: #0a0a0a;
+  /* Success: Olive green #6B6B4B */
+  --success: #6b6b4b;
+  --success-foreground: #ffffff;
+  /* Destructive: Bright Red #B30000 */
+  --destructive: #b30000;
+  --destructive-foreground: #ffffff;
+  --border: #e5e2d9;
+  --input: #f5f3ee;
+  --ring: #5c1515;
+  /* Chart colors using the palette */
+  --chart-1: #5c1515;
+  --chart-2: #d4c896;
+  --chart-3: #6b6b4b;
+  --chart-4: #b30000;
+  --chart-5: #0a0a0a;
+  --radius: 0.75rem;
+  /* Sidebar: Black #0A0A0A */
+  --sidebar: #0a0a0a;
+  --sidebar-foreground: #fafaf8;
+  --sidebar-primary: #d4c896;
+  --sidebar-primary-foreground: #0a0a0a;
+  --sidebar-accent: #1a1a1a;
+  --sidebar-accent-foreground: #fafaf8;
+  --sidebar-border: #2a2a2a;
+  --sidebar-ring: #5c1515;
+}
+
+.dark {
+  --background: #0a0a0a;
+  --foreground: #fafaf8;
+  --card: #141414;
+  --card-foreground: #fafaf8;
+  --popover: #141414;
+  --popover-foreground: #fafaf8;
+  --primary: #7a2020;
+  --primary-foreground: #ffffff;
+  --secondary: #a89f70;
+  --secondary-foreground: #fafaf8;
+  --muted: #1a1a1a;
+  --muted-foreground: #8b8b6b;
+  --accent: #a89f70;
+  --accent-foreground: #fafaf8;
+  --success: #6b6b4b;
+  --success-foreground: #ffffff;
+  --destructive: #cc0000;
+  --destructive-foreground: #fafaf8;
+  --border: #2a2a2a;
+  --input: #1a1a1a;
+  --ring: #7a2020;
+  --chart-1: #7a2020;
+  --chart-2: #a89f70;
+  --chart-3: #8b8b6b;
+  --chart-4: #cc0000;
+  --chart-5: #3a3a3a;
+}
+
+@theme inline {
+  --font-sans: "Inter", "Inter Fallback", sans-serif;
+  --font-mono: "Geist Mono", "Geist Mono Fallback", monospace;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Hero gradient using maroon to black from palette */
+.hero-gradient {
+  background: linear-gradient(180deg, #5c1515 0%, #0a0a0a 100%);
+}
+
+/* Added marquee animation for partners section */
+@keyframes marquee {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-marquee {
+  animation: marquee 30s linear infinite;
+}
+
+.animate-marquee:hover {
+  animation-play-state: paused;
+}
+
+/* Smooth scroll behavior */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--muted);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--muted-foreground);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--primary);
+}
