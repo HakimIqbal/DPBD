@@ -1,0 +1,88 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+# BACKEND GITIGNORE - Comprehensive patterns untuk backend (NestJS)
+# Note: Git repository is in backend/, so all necessary patterns must be here
+
+# ===== DEPENDENCIES =====
+node_modules/
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+
+# ===== BUILD OUTPUT =====
+/dist
+*.tsbuildinfo
+/build
+/out
+
+# ===== DEBUG & LOGS =====
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+*.log
+*.log.*
+client.log
+server.log
+backend.log
+
+# ===== ENVIRONMENT VARIABLES =====
+.env
+.env.local
+.env.*.local
+.env.production.local
+.env.development.local
+.env.test.local
+
+# ===== DATABASE =====
+*.db
+*.sqlite
+*.sqlite3
+dpbd.db
+
+# ===== TEST & COVERAGE =====
+/coverage
+/.nyc_output
+
+# ===== RUNTIME DATA =====
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# ===== DIAGNOSTIC REPORTS =====
+report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+
+# ===== TEMPORARY FILES =====
+.temp
+tmp/
+temp/
+cache/
+
+# ===== OS SPECIFIC =====
+.DS_Store
+._*
+.AppleDouble
+.LSOverride
+.Spotlight-V100
+.Trashes
+Thumbs.db
+
+# ===== IDE & EDITORS =====
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+.idea/
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-workspace
+
+# ===== EDITOR CONFIG =====
+*.swp
+*.swo
+*~
