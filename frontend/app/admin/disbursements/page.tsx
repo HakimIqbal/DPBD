@@ -28,6 +28,7 @@ import {
   Loader2,
 } from "lucide-react"
 import { Textarea } from "@/components/ui/textarea"
+import { formatRupiah } from "@/lib/utils"
 
 // Default general fund data if API fails
 const DEFAULT_GENERAL_FUND = {
@@ -38,9 +39,6 @@ const DEFAULT_GENERAL_FUND = {
 
 // Pengajuan dari Finance yang menunggu review Admin
 const DEFAULT_REQUESTS: any[] = []
-
-const formatRupiah = (num: number) =>
-  new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(num)
 
 const statusConfig: Record<string, { label: string; color: string }> = {
   pending: { label: "Menunggu Review", color: "bg-amber-500/10 text-amber-600 border-0" },

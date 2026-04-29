@@ -12,6 +12,8 @@ import {
   AuditLog,
   Investment,
   InvestmentTransaction,
+  RiskThreshold,
+  RiskAlert,
 } from './entities';
 
 /**
@@ -39,6 +41,8 @@ export const AppDataSource = new DataSource({
     AuditLog,
     Investment,
     InvestmentTransaction,
+    RiskThreshold,
+    RiskAlert,
   ],
   migrations: [path.join(__dirname, 'migrations/*{.ts,.js}')],
   synchronize: false,

@@ -76,6 +76,19 @@ export class InvestmentService {
   ) {}
 
   /**
+   * Most recent transactions across the entire portfolio, newest first.
+   * Used by the Investment Manager dashboard. Capped at 50 to bound
+   * response size; defaults to 5 to match the dashboard's footprint.
+   */
+  async getRecentTransactions(limit = 5): Promise<InvestmentTransaction[]> {
+    const safeLimit = Math.max(1, Math.min(50, Math.floor(limit)));
+    return this.transactionRepo.find({
+      order: { transactionDate: 'DESC', createdAt: 'DESC' },
+      take: safeLimit,
+    });
+  }
+
+  /**
    * Aggregate portfolio statistics: totals, return %, allocation pie,
    * and lifecycle counts. Computed in JS from the full row set rather
    * than pushed to SQL — the portfolio is small (dozens to low

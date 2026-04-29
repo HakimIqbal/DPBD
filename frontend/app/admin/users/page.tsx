@@ -13,6 +13,7 @@ import { Search, MoreVertical, Shield, Ban, Mail, Building2, UserIcon, UserPlus,
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { usersApi } from '@/lib/api'
+import { formatRupiah } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
 import { PermissionGate } from '@/components/ui/permission-gate'
 import { AccessDenied } from '@/components/admin/access-denied'
@@ -90,10 +91,6 @@ interface User {
   createdAt: string
   companyName?: string
   npwp?: string
-}
-
-const formatRupiah = (num: number) => {
-  return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(num)
 }
 
 const roleConfig: Record<UserRole, { label: string; color: string }> = {

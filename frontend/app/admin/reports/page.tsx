@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { Loader2, Wallet, TrendingUp, CheckCircle, Clock, DollarSign, Users, BarChart3, ArrowUpRight, ArrowDownLeft, AlertCircle } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { donationsApi, disbursementsApi, usersApi } from '@/lib/api'
+import { formatRupiah } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
 import {
   Chart as ChartJS,
@@ -41,10 +42,6 @@ interface Disbursement {
   status: 'pending' | 'approved' | 'completed' | 'rejected'
   description: string
   createdAt: string
-}
-
-const formatRupiah = (num: number) => {
-  return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(num)
 }
 
 export default function ReportsPage() {

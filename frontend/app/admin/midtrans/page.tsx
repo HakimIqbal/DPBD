@@ -26,6 +26,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { formatRupiah } from "@/lib/utils"
 
 const webhookLogs = [
   {
@@ -84,10 +85,6 @@ const webhookLogs = [
     paymentType: "credit_card",
   },
 ]
-
-const formatRupiah = (num: number) => {
-  return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(num)
-}
 
 export default function MidtransPage() {
   const [showServerKey, setShowServerKey] = useState(false)

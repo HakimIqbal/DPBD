@@ -41,6 +41,19 @@ export class InvestmentController {
   }
 
   /**
+   * GET /api/investments/transactions/recent?limit=5
+   * Cross-portfolio transaction feed for the Investment Manager
+   * dashboard. Declared as a non-UUID literal path so it doesn't
+   * collide with the `:id` route below.
+   */
+  @Get('transactions/recent')
+  @RequirePermissions(Permission.READ_PORTFOLIO)
+  async getRecentTransactions(@Query('limit') limitRaw?: string) {
+    const limit = limitRaw ? Number.parseInt(limitRaw, 10) : 5;
+    return this.investmentService.getRecentTransactions(limit);
+  }
+
+  /**
    * GET /api/investments?instrumentType=&status=&page=&limit=
    * Paginated list, newest purchase date first.
    */
