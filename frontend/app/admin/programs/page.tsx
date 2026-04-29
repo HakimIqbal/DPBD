@@ -34,6 +34,7 @@ import {
 } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
+import { formatRupiah } from "@/lib/utils"
 
 const categoryIcons: Record<string, React.ElementType> = {
   education: GraduationCap,
@@ -61,9 +62,6 @@ const categoryColors: Record<string, string> = {
   environment: "bg-green-500/10 text-green-600",
   emergency: "bg-orange-500/10 text-orange-600",
 }
-
-const formatRupiah = (num: number) =>
-  new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(num)
 
 const DEFAULT_PROGRAMS: any[] = []
 
@@ -112,7 +110,8 @@ export default function ProgramsPage() {
   }, [])
 
   const filteredPrograms = programs.filter((p) => {
-    if (searchQuery && !p.name.toLowerCase().includes(searchQuery.toLowerCase())) return false
+    const title: string = p.title ?? p.name ?? ""
+    if (searchQuery && !title.toLowerCase().includes(searchQuery.toLowerCase())) return false
     if (statusFilter !== "all" && p.status !== statusFilter) return false
     return true
   })
@@ -277,7 +276,7 @@ export default function ProgramsPage() {
                       <Icon className="w-5 h-5" />
                     </div>
                     <div>
-                      <p className="font-semibold text-sm leading-tight">{program.name}</p>
+                      <p className="font-semibold text-sm leading-tight">{program.title ?? program.name}</p>
                       <p className="text-xs text-muted-foreground">{categoryLabels[program.category]}</p>
                     </div>
                   </div>
@@ -312,12 +311,12 @@ export default function ProgramsPage() {
                 {/* Stats */}
                 <div className="flex items-center justify-between pt-3 border-t">
                   <div className="text-center">
-                    <p className="text-lg font-bold">{program.disbursementCount}</p>
-                    <p className="text-xs text-muted-foreground">Penyaluran</p>
+                    <p className="text-lg font-bold">{program.donorCount ?? 0}</p>
+                    <p className="text-xs text-muted-foreground">Donatur</p>
                   </div>
                   <div className="text-center">
-                    <p className="text-sm font-bold">{formatRupiah(program.totalDisbursed)}</p>
-                    <p className="text-xs text-muted-foreground">Total Disalurkan</p>
+                    <p className="text-sm font-bold">{formatRupiah(program.collectedAmount)}</p>
+                    <p className="text-xs text-muted-foreground">Terkumpul</p>
                   </div>
                   <Badge
                     className={

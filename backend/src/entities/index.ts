@@ -17,3 +17,9 @@ export {
   type InvestmentStatus,
   type InvestmentTransactionType,
 } from './investment.entity';
+export {
+  RiskThreshold,
+  RiskAlert,
+  type RiskOperator,
+  type RiskSeverity,
+} from './risk-threshold.entity';

@@ -32,6 +32,12 @@ import {
   Cell,
 } from "recharts"
 import Link from "next/link"
+import { formatRupiah } from "@/lib/utils"
+import { useRole } from "@/hooks/use-permission"
+import { CFODashboard } from "@/components/admin/dashboards/cfo-dashboard"
+import { InvestmentManagerDashboard } from "@/components/admin/dashboards/investment-manager-dashboard"
+import { DewanDashboard } from "@/components/admin/dashboards/dewan-dashboard"
+import { RiskManagerDashboard } from "@/components/admin/dashboards/risk-manager-dashboard"
 
 // Default/fallback data if API fails
 const DEFAULT_STATS = [
@@ -73,10 +79,6 @@ const DEFAULT_STATS = [
   },
 ]
 
-const formatRupiah = (num: number) => {
-  return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(num)
-}
-
 // Custom tooltip component to fix label error
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
@@ -100,7 +102,27 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   return null
 }
 
+/**
+ * Role-specific dashboard dispatcher. Each org role we've built a custom
+ * view for short-circuits to its own component; everything else
+ * (admin, ceo, finance, editor, ethic_committee, partnership, audit,
+ * personal, company) falls through to the generic DefaultAdminDashboard
+ * below.
+ */
 export default function AdminOverviewPage() {
+  const role = useRole()
+
+  if (role === "cfo") return <CFODashboard />
+  if (role === "investment_manager") return <InvestmentManagerDashboard />
+  if (role === "dewan_pembina" || role === "dewan_pengawas") {
+    return <DewanDashboard role={role} />
+  }
+  if (role === "risk_manager") return <RiskManagerDashboard />
+
+  return <DefaultAdminDashboard />
+}
+
+function DefaultAdminDashboard() {
   const [stats, setStats] = useState(DEFAULT_STATS)
   const [chartData, setChartData] = useState<any[]>([])
   const [distributionData, setDistributionData] = useState<any[]>([])

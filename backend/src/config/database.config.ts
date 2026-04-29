@@ -12,6 +12,8 @@ import {
   AuditLog,
   Investment,
   InvestmentTransaction,
+  RiskThreshold,
+  RiskAlert,
 } from '../entities';
 
 export const databaseConfig = registerAs(
@@ -37,6 +39,8 @@ export const databaseConfig = registerAs(
         AuditLog,
         Investment,
         InvestmentTransaction,
+        RiskThreshold,
+        RiskAlert,
       ],
       migrations: [path.join(__dirname, '../migrations/*{.ts,.js}')],
       synchronize: !isProduction,
