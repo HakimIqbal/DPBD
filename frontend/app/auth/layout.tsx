@@ -1,7 +1,11 @@
-import type { ReactNode } from "react"
+"use client"
+
+import { useEffect, useState, type ReactNode } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { GraduationCap, Heart, Users } from "lucide-react"
+import { Skeleton } from "@/components/ui/skeleton"
+import { formatRupiah } from "@/lib/utils"
 
 const features = [
   { icon: GraduationCap, label: "Beasiswa Pelajar", desc: "Mendukung pendidikan diaspora" },
@@ -9,7 +13,38 @@ const features = [
   { icon: Users, label: "Pemberdayaan UMKM", desc: "Modal usaha untuk diaspora" },
 ]
 
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api"
+
+interface PublicStats {
+  totalDonatur: number
+  totalDonasi: number
+  totalProgram: number
+}
+
 export default function AuthLayout({ children }: { children: ReactNode }) {
+  const [stats, setStats] = useState<PublicStats | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/analytics/public-stats`)
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const data = (await res.json()) as PublicStats
+        if (!cancelled) setStats(data)
+      } catch (err) {
+        // Stats are decorative on the auth panel — failure should NOT
+        // block the user from logging in. Leave `stats` null so the
+        // skeleton stays visible (better than showing stale 50M+/1.200+
+        // numbers that drift from reality).
+        console.warn("AuthLayout: failed to load public stats:", err)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   return (
     <div className="min-h-screen bg-muted/30 flex">
       {/* Left side - Branding */}
@@ -64,18 +99,36 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
             ))}
           </div>
 
-          {/* Stats */}
+          {/* Stats — live from /api/analytics/public-stats */}
           <div className="grid grid-cols-3 gap-4 pt-4">
             <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 text-center">
-              <p className="text-2xl xl:text-3xl font-bold text-[#D4C896]">Rp 50M+</p>
+              {stats ? (
+                <p className="text-2xl xl:text-3xl font-bold text-[#D4C896]">
+                  {formatRupiah(stats.totalDonasi)}
+                </p>
+              ) : (
+                <Skeleton className="h-8 xl:h-9 w-24 mx-auto bg-white/20" />
+              )}
               <p className="text-white/60 text-xs mt-1">Total Donasi</p>
             </div>
             <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 text-center">
-              <p className="text-2xl xl:text-3xl font-bold text-[#D4C896]">1.200+</p>
+              {stats ? (
+                <p className="text-2xl xl:text-3xl font-bold text-[#D4C896]">
+                  {stats.totalDonatur.toLocaleString("id-ID")}+
+                </p>
+              ) : (
+                <Skeleton className="h-8 xl:h-9 w-16 mx-auto bg-white/20" />
+              )}
               <p className="text-white/60 text-xs mt-1">Donatur Aktif</p>
             </div>
             <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 text-center">
-              <p className="text-2xl xl:text-3xl font-bold text-[#D4C896]">45+</p>
+              {stats ? (
+                <p className="text-2xl xl:text-3xl font-bold text-[#D4C896]">
+                  {stats.totalProgram}+
+                </p>
+              ) : (
+                <Skeleton className="h-8 xl:h-9 w-12 mx-auto bg-white/20" />
+              )}
               <p className="text-white/60 text-xs mt-1">Program</p>
             </div>
           </div>
