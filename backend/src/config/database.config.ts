@@ -9,6 +9,9 @@ import {
   News,
   Faq,
   Disbursement,
+  AuditLog,
+  Investment,
+  InvestmentTransaction,
 } from '../entities';
 
 export const databaseConfig = registerAs(
@@ -23,7 +26,18 @@ export const databaseConfig = registerAs(
       username: process.env.DATABASE_USERNAME,
       password: process.env.DATABASE_PASSWORD,
       database: process.env.DATABASE_NAME || 'postgres',
-      entities: [User, Program, Donation, Partner, News, Faq, Disbursement],
+      entities: [
+        User,
+        Program,
+        Donation,
+        Partner,
+        News,
+        Faq,
+        Disbursement,
+        AuditLog,
+        Investment,
+        InvestmentTransaction,
+      ],
       migrations: [path.join(__dirname, '../migrations/*{.ts,.js}')],
       synchronize: !isProduction,
       logging: process.env.NODE_ENV === 'development',

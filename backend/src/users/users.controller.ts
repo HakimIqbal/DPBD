@@ -7,19 +7,29 @@ import {
   Body,
   UseGuards,
   Request,
+  Req,
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
 import type { AuthenticatedRequest } from '../types';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
 import { UpdateUserDto } from './dto/create-user.dto';
+import { AuditService } from '../audit/audit.service';
+import { auditActorFromReq } from '../audit/audit-actor.util';
 
 @Controller('users')
 export class UsersController {
-  constructor(private usersService: UsersService) {}
+  constructor(
+    private usersService: UsersService,
+    private auditService: AuditService,
+  ) {}
 
   @Get()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
   async findAll() {
     return this.usersService.findAll();
   }
@@ -51,21 +61,47 @@ export class UsersController {
   }
 
   @Patch(':id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
   async update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
     return this.usersService.update(id, updateUserDto);
   }
 
   @Patch(':id/status/:status')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
   async updateStatus(
     @Param('id') id: string,
     @Param('status') status: 'active' | 'suspended' | 'deleted',
+    @Req() req: AuthenticatedRequest,
   ) {
-    return this.usersService.updateStatus(id, status);
+    const updated = await this.usersService.updateStatus(id, status);
+
+    await this.auditService.log({
+      ...auditActorFromReq(req),
+      action: 'USER_STATUS_CHANGED',
+      entityType: 'User',
+      entityId: id,
+      metadata: { newStatus: status },
+    });
+
+    return updated;
   }
 
   @Delete(':id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async delete(@Param('id') id: string) {
-    return this.usersService.delete(id);
+  async delete(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
+    const result = await this.usersService.delete(id);
+
+    await this.auditService.log({
+      ...auditActorFromReq(req),
+      action: 'USER_DELETED',
+      entityType: 'User',
+      entityId: id,
+    });
+
+    return result;
   }
 }

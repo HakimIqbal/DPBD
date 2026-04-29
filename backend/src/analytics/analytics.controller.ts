@@ -1,5 +1,8 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { AnalyticsService } from './analytics.service';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
 import type {
   DashboardMetrics,
   ProgramPerformance,
@@ -13,16 +16,18 @@ export class AnalyticsController {
   constructor(private analyticsService: AnalyticsService) {}
 
   /**
-   * Get overall dashboard metrics
+   * Get overall dashboard metrics (admin/finance KPI dashboard)
    * GET /analytics/dashboard
    */
   @Get('dashboard')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin', 'finance')
   async getDashboard(): Promise<DashboardMetrics> {
     return await this.analyticsService.getDashboardMetrics();
   }
 
   /**
-   * Get programs performance
+   * Get programs performance — public for transparency
    * GET /analytics/programs
    */
   @Get('programs')
@@ -31,7 +36,7 @@ export class AnalyticsController {
   }
 
   /**
-   * Get top programs by collection
+   * Get top programs by collection — public for transparency
    * GET /analytics/programs/top
    */
   @Get('programs/top')
@@ -43,7 +48,7 @@ export class AnalyticsController {
   }
 
   /**
-   * Get donation trends
+   * Get donation trends — public for transparency
    * GET /analytics/trends
    */
   @Get('trends')
@@ -55,16 +60,18 @@ export class AnalyticsController {
   }
 
   /**
-   * Get payment method statistics
+   * Get payment method statistics — internal (admin/finance only)
    * GET /analytics/payment-methods
    */
   @Get('payment-methods')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin', 'finance')
   async getPaymentMethodStats(): Promise<PaymentMethodStats[]> {
     return await this.analyticsService.getPaymentMethodStats();
   }
 
   /**
-   * Get recent donations
+   * Get recent donations — public for transparency
    * GET /analytics/recent
    */
   @Get('recent')
@@ -76,10 +83,12 @@ export class AnalyticsController {
   }
 
   /**
-   * Get donor statistics
+   * Get donor statistics — internal (admin/finance only)
    * GET /analytics/donors
    */
   @Get('donors')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin', 'finance')
   async getDonorStatistics(): Promise<{
     totalDonors: number;
     uniqueDonors: number;

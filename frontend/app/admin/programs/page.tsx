@@ -88,7 +88,7 @@ export default function ProgramsPage() {
       try {
         const response = await fetch("http://localhost:3001/api/programs", {
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
+            Authorization: `Bearer ${localStorage.getItem("dpbd_token")}`,
             "Content-Type": "application/json",
           },
         })

@@ -21,6 +21,10 @@ export class RegisterDto {
   @IsEnum(['personal', 'company'])
   role: UserRole;
 
+  @IsOptional()
+  @IsString()
+  country?: string;
+
   // Company-specific fields (optional for personal users)
   @IsOptional()
   @IsString()

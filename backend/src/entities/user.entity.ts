@@ -9,7 +9,21 @@ import {
 import { Exclude } from 'class-transformer';
 import { Donation } from './index';
 
-export type UserRole = 'admin' | 'editor' | 'finance' | 'personal' | 'company';
+export type UserRole =
+  | 'admin'
+  | 'editor'
+  | 'finance'
+  | 'personal'
+  | 'company'
+  | 'ceo'
+  | 'cfo'
+  | 'investment_manager'
+  | 'risk_manager'
+  | 'ethic_committee'
+  | 'audit_independent'
+  | 'dewan_pengawas'
+  | 'dewan_pembina'
+  | 'partnership_onboarding';
 export type UserStatus = 'active' | 'suspended' | 'deleted';
 
 @Entity('users')
@@ -29,7 +43,22 @@ export class User {
 
   @Column({
     type: 'enum',
-    enum: ['admin', 'editor', 'finance', 'personal', 'company'],
+    enum: [
+      'admin',
+      'editor',
+      'finance',
+      'personal',
+      'company',
+      'ceo',
+      'cfo',
+      'investment_manager',
+      'risk_manager',
+      'ethic_committee',
+      'audit_independent',
+      'dewan_pengawas',
+      'dewan_pembina',
+      'partnership_onboarding',
+    ],
     default: 'personal',
   })
   role: UserRole;

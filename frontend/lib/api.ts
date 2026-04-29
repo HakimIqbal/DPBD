@@ -16,7 +16,11 @@ class ApiClient {
 
   private getAuthToken(): string | null {
     if (typeof window === 'undefined') return null;
-    return localStorage.getItem('access_token');
+    // Token is written by auth-context under the `dpbd_token` key — keep
+    // this in sync with `frontend/lib/auth-context.tsx`. Reading the wrong
+    // key silently produces unauthenticated requests, which surface as
+    // empty data rather than visible errors.
+    return localStorage.getItem('dpbd_token');
   }
 
   private getHeaders(includeAuth = true): HeadersInit {

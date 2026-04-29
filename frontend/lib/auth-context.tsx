@@ -1,10 +1,16 @@
 "use client"
 
-import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
+import { createContext, useContext, useState, useEffect, useMemo, useCallback, type ReactNode } from "react"
+import {
+  Permission,
+  permissionsForRole,
+  hasPermission as roleHasPermission,
+  type UserRole,
+} from "@/lib/permissions"
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api"
 
-export type UserRole = "admin" | "editor" | "finance" | "personal" | "company"
+export type { UserRole }
 
 export interface User {
   id: string
@@ -22,6 +28,8 @@ export interface User {
 interface AuthContextType {
   user: User | null
   isLoading: boolean
+  permissions: Permission[]
+  hasPermission: (p: Permission) => boolean
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string; redirectTo?: string }>
   register: (data: RegisterData) => Promise<{ success: boolean; error?: string }>
   logout: () => void
@@ -52,6 +60,18 @@ function getRedirectPath(role: UserRole): string {
     case "personal":
     case "company":
       return "/user"
+    // Organizational roles all land on the admin shell — sidebar gates
+    // expose only the menu items each role is allowed to use.
+    case "ceo":
+    case "cfo":
+    case "investment_manager":
+    case "risk_manager":
+    case "ethic_committee":
+    case "audit_independent":
+    case "dewan_pengawas":
+    case "dewan_pembina":
+    case "partnership_onboarding":
+      return "/admin"
     default:
       return "/"
   }
@@ -162,7 +182,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  return <AuthContext.Provider value={{ user, isLoading, login, register, logout }}>{children}</AuthContext.Provider>
+  // Permissions are derived from the current user's role. Recomputed only
+  // when role changes — guards against re-renders from unrelated state.
+  const permissions = useMemo<Permission[]>(
+    () => permissionsForRole(user?.role ?? null),
+    [user?.role],
+  )
+
+  const hasPermission = useCallback(
+    (p: Permission) => roleHasPermission(user?.role ?? null, p),
+    [user?.role],
+  )
+
+  return (
+    <AuthContext.Provider
+      value={{ user, isLoading, permissions, hasPermission, login, register, logout }}
+    >
+      {children}
+    </AuthContext.Provider>
+  )
 }
 
 export function useAuth() {

@@ -9,3 +9,11 @@ export { Partner } from './partner.entity';
 export { News } from './news.entity';
 export { Faq } from './faq.entity';
 export { Disbursement } from './disbursement.entity';
+export { AuditLog } from './audit-log.entity';
+export {
+  Investment,
+  InvestmentTransaction,
+  type InstrumentType,
+  type InvestmentStatus,
+  type InvestmentTransactionType,
+} from './investment.entity';

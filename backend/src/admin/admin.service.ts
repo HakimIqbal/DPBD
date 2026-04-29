@@ -1,9 +1,18 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  ConflictException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import * as bcrypt from 'bcryptjs';
 import { Donation } from '../entities/donation.entity';
 import { Program } from '../entities/program.entity';
+import { User } from '../entities/user.entity';
 import { EmailService } from '../email/email.service';
+import { AuditService } from '../audit/audit.service';
+import type { AuditActor } from '../audit/audit-actor.util';
+import { CreateAdminUserDto } from './dto/create-admin-user.dto';
 
 export interface BulkActionResult {
   success: number;
@@ -20,8 +29,65 @@ export class AdminService {
     private donationRepository: Repository<Donation>,
     @InjectRepository(Program)
     private programRepository: Repository<Program>,
+    @InjectRepository(User)
+    private userRepository: Repository<User>,
     private emailService: EmailService,
+    private auditService: AuditService,
   ) {}
+
+  /**
+   * Create an organizational user (admin/editor/finance/ceo/cfo/...) with a
+   * pre-set password. Donor roles (`personal`, `company`) are rejected — they
+   * must self-register via the public /auth/register endpoint.
+   *
+   * Returns the created user with the password hash stripped.
+   *
+   * @param actor - Caller identity for the audit trail. Optional so the
+   *   method can still be called from a script context (e.g. seed) without
+   *   a request — audit log will record `null` actor in that case.
+   */
+  async createUser(
+    dto: CreateAdminUserDto,
+    actor?: AuditActor,
+  ): Promise<Omit<User, 'password'>> {
+    const existing = await this.userRepository.findOne({
+      where: { email: dto.email },
+    });
+    if (existing) {
+      throw new ConflictException('Email already registered');
+    }
+
+    const hashedPassword = await bcrypt.hash(dto.password, 10);
+
+    const user = this.userRepository.create({
+      email: dto.email,
+      name: dto.name,
+      role: dto.role,
+      password: hashedPassword,
+      isActive: true,
+      status: 'active',
+    });
+
+    const saved = await this.userRepository.save(user);
+
+    // Audit AFTER the save so we never log a creation that didn't happen.
+    // AuditService swallows its own errors, so this can never break the
+    // user-creation flow — the password hash is intentionally not in the
+    // metadata, only the email and resulting role.
+    await this.auditService.log({
+      ...(actor ?? {}),
+      action: 'USER_CREATED',
+      entityType: 'User',
+      entityId: saved.id,
+      metadata: { email: dto.email, role: dto.role },
+    });
+
+    // Strip the password hash from the response — never expose it, even
+    // to admins. Same pattern used by AuthService.generateAuthResponse.
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { password: _password, ...safeUser } = saved;
+    return safeUser;
+  }
 
   /**
    * Bulk approve donations

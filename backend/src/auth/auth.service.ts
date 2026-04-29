@@ -39,6 +39,7 @@ export class AuthService {
       password: hashedPassword,
       name: registerDto.name,
       role: registerDto.role,
+      country: registerDto.country,
       companyName: registerDto.companyName,
       npwp: registerDto.npwp,
       picName: registerDto.picName,

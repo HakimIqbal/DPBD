@@ -12,15 +12,78 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Search, MoreVertical, Shield, Ban, Mail, Building2, UserIcon, UserPlus, Trash2, Loader2, AlertCircle, Eye } from 'lucide-react'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { usersApi, authApi } from '@/lib/api'
+import { usersApi } from '@/lib/api'
 import { useToast } from '@/hooks/use-toast'
+import { PermissionGate } from '@/components/ui/permission-gate'
+import { AccessDenied } from '@/components/admin/access-denied'
+import { Permission, type UserRole } from '@/lib/permissions'
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api'
+
+/**
+ * Authenticated fetch using the same token key as auth-context (`dpbd_token`).
+ * Used for the new POST /admin/users/create call and for refreshing the user
+ * list afterwards. The shared `lib/api.ts` reads from the wrong key, so we
+ * inline the authenticated call here to keep this feature working end-to-end.
+ */
+async function authedFetch(path: string, init?: RequestInit): Promise<unknown> {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('dpbd_token') : null
+  const res = await fetch(`${API_BASE_URL}${path}`, {
+    ...init,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token && { Authorization: `Bearer ${token}` }),
+      ...(init?.headers ?? {}),
+    },
+  })
+  if (!res.ok) {
+    const errBody = await res.json().catch(() => ({}))
+    const message =
+      typeof errBody === 'object' && errBody !== null && 'message' in errBody
+        ? String((errBody as { message: unknown }).message)
+        : `HTTP ${res.status}`
+    throw new Error(message)
+  }
+  return res.json()
+}
+
+/**
+ * Roles selectable in the "Tambah Pengguna" dropdown. `personal` and
+ * `company` are excluded — donor accounts must self-register so the consent
+ * flow runs. Must stay in sync with `ADMIN_CREATABLE_ROLES` in
+ * backend/src/admin/dto/create-admin-user.dto.ts.
+ */
+const ORG_ROLE_OPTIONS: { value: UserRole; label: string }[] = [
+  { value: 'admin', label: 'Admin' },
+  { value: 'editor', label: 'Editor' },
+  { value: 'finance', label: 'Finance' },
+  { value: 'ceo', label: 'CEO' },
+  { value: 'cfo', label: 'CFO' },
+  { value: 'investment_manager', label: 'Investment Manager' },
+  { value: 'risk_manager', label: 'Risk Manager' },
+  { value: 'ethic_committee', label: 'Komite Etik' },
+  { value: 'audit_independent', label: 'Audit Independen' },
+  { value: 'dewan_pengawas', label: 'Dewan Pengawas' },
+  { value: 'dewan_pembina', label: 'Dewan Pembina' },
+  { value: 'partnership_onboarding', label: 'Partnership Onboarding' },
+]
+
+/**
+ * All 14 roles for the filter dropdown — donor + organizational. Donor
+ * roles are listed first so non-staff filtering is one click away.
+ */
+const ALL_ROLE_OPTIONS: { value: UserRole; label: string }[] = [
+  { value: 'personal', label: 'Personal' },
+  { value: 'company', label: 'Perusahaan' },
+  ...ORG_ROLE_OPTIONS,
+]
 
 interface User {
   id: string
   email: string
   name: string
   avatar?: string
-  role: 'personal' | 'company' | 'admin' | 'editor' | 'finance'
+  role: UserRole
   status: 'active' | 'suspended' | 'deleted'
   country?: string
   totalDonation?: number
@@ -33,13 +96,30 @@ const formatRupiah = (num: number) => {
   return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(num)
 }
 
-const roleConfig = {
+const roleConfig: Record<UserRole, { label: string; color: string }> = {
   personal: { label: 'Personal', color: 'bg-blue-100 text-blue-800' },
   company: { label: 'Perusahaan', color: 'bg-purple-100 text-purple-800' },
   admin: { label: 'Admin', color: 'bg-red-100 text-red-800' },
   editor: { label: 'Editor', color: 'bg-green-100 text-green-800' },
   finance: { label: 'Finance', color: 'bg-yellow-100 text-yellow-800' },
+  ceo: { label: 'CEO', color: 'bg-amber-100 text-amber-800' },
+  cfo: { label: 'CFO', color: 'bg-amber-100 text-amber-800' },
+  investment_manager: { label: 'Investment Mgr', color: 'bg-teal-100 text-teal-800' },
+  risk_manager: { label: 'Risk Manager', color: 'bg-orange-100 text-orange-800' },
+  ethic_committee: { label: 'Komite Etik', color: 'bg-rose-100 text-rose-800' },
+  audit_independent: { label: 'Audit Indep.', color: 'bg-slate-100 text-slate-800' },
+  dewan_pengawas: { label: 'Dewan Pengawas', color: 'bg-indigo-100 text-indigo-800' },
+  dewan_pembina: { label: 'Dewan Pembina', color: 'bg-indigo-100 text-indigo-800' },
+  partnership_onboarding: { label: 'Partnership', color: 'bg-cyan-100 text-cyan-800' },
 }
+
+/** Roles considered "staff" for the grouped staff section. */
+const STAFF_ROLES: UserRole[] = [
+  'admin', 'editor', 'finance',
+  'ceo', 'cfo', 'investment_manager', 'risk_manager',
+  'ethic_committee', 'audit_independent',
+  'dewan_pengawas', 'dewan_pembina', 'partnership_onboarding',
+]
 
 const statusConfig = {
   active: { label: 'Aktif', color: 'bg-green-100 text-green-800' },
@@ -58,7 +138,12 @@ export default function UsersPage() {
   const [detailDialog, setDetailDialog] = useState<{ open: boolean; user: User | null }>({ open: false, user: null })
   const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; user: User | null }>({ open: false, user: null })
   const [statusChangeConfirm, setStatusChangeConfirm] = useState<{ open: boolean; user: User | null; newStatus: string }>({ open: false, user: null, newStatus: '' })
-  const [newStaff, setNewStaff] = useState({ name: '', email: '', password: '', role: 'editor' })
+  const [newStaff, setNewStaff] = useState<{ name: string; email: string; password: string; role: UserRole }>({
+    name: '',
+    email: '',
+    password: '',
+    role: 'editor',
+  })
 
   // Fetch users on mount
   useEffect(() => {
@@ -94,7 +179,7 @@ export default function UsersPage() {
   // Group users by role/type
   const personalUsers = filteredUsers.filter(u => u.role === 'personal')
   const companyUsers = filteredUsers.filter(u => u.role === 'company')
-  const staffUsers = filteredUsers.filter(u => ['admin', 'editor', 'finance'].includes(u.role))
+  const staffUsers = filteredUsers.filter(u => STAFF_ROLES.includes(u.role))
 
   const handleAddStaff = async () => {
     if (!newStaff.name || !newStaff.email || !newStaff.password) {
@@ -106,30 +191,47 @@ export default function UsersPage() {
       return
     }
 
+    if (newStaff.password.length < 8) {
+      toast({
+        title: 'Error',
+        description: 'Password minimal 8 karakter',
+        variant: 'destructive',
+      })
+      return
+    }
+
     try {
-      await authApi.register({
-        name: newStaff.name,
-        email: newStaff.email,
-        password: newStaff.password,
-        role: newStaff.role as 'admin' | 'editor' | 'finance',
+      await authedFetch('/admin/users/create', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: newStaff.name,
+          email: newStaff.email,
+          password: newStaff.password,
+          role: newStaff.role,
+        }),
       })
 
       toast({
         title: 'Sukses',
-        description: 'Staf baru berhasil ditambahkan',
+        description: `Pengguna ${newStaff.name} berhasil ditambahkan`,
       })
 
       setNewStaff({ name: '', email: '', password: '', role: 'editor' })
       setAddStaffDialog(false)
 
-      // Refresh users list
-      const data = await usersApi.getAll()
-      setAllUsers(Array.isArray(data) ? data : [])
+      // Refresh user list using authenticated fetch (the shared apiClient
+      // reads the wrong token key — see authedFetch above).
+      try {
+        const data = await authedFetch('/users')
+        setAllUsers(Array.isArray(data) ? (data as User[]) : [])
+      } catch {
+        // Non-fatal — the new user was created; just leave list as-is.
+      }
     } catch (error) {
-      console.error('Error adding staff:', error)
+      console.error('Error adding user:', error)
       toast({
         title: 'Error',
-        description: 'Gagal menambahkan staf',
+        description: error instanceof Error ? error.message : 'Gagal menambahkan pengguna',
         variant: 'destructive',
       })
     }
@@ -185,13 +287,16 @@ export default function UsersPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-      </div>
+      <PermissionGate require={Permission.MANAGE_USERS} fallback={<AccessDenied />}>
+        <div className="flex items-center justify-center min-h-screen">
+          <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+        </div>
+      </PermissionGate>
     )
   }
 
   return (
+    <PermissionGate require={Permission.MANAGE_USERS} fallback={<AccessDenied />}>
     <div className="space-y-6">
       {/* Header */}
       <div>
@@ -220,11 +325,11 @@ export default function UsersPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Semua</SelectItem>
-                  <SelectItem value="personal">Personal</SelectItem>
-                  <SelectItem value="company">Perusahaan</SelectItem>
-                  <SelectItem value="admin">Admin</SelectItem>
-                  <SelectItem value="editor">Editor</SelectItem>
-                  <SelectItem value="finance">Finance</SelectItem>
+                  {ALL_ROLE_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -243,7 +348,7 @@ export default function UsersPage() {
             </div>
             <Button onClick={() => setAddStaffDialog(true)} className="gap-2">
               <UserPlus className="h-4 w-4" />
-              Tambah Staf
+              Tambah Pengguna
             </Button>
           </div>
         </CardContent>
@@ -452,12 +557,15 @@ export default function UsersPage() {
         </div>
       )}
 
-      {/* Add Staff Dialog */}
+      {/* Add User Dialog */}
       <Dialog open={addStaffDialog} onOpenChange={setAddStaffDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Tambah Staf Baru</DialogTitle>
-            <DialogDescription>Buat akun staf baru dengan role admin, editor, atau finance</DialogDescription>
+            <DialogTitle>Tambah Pengguna</DialogTitle>
+            <DialogDescription>
+              Buat akun pengguna organisasi (admin, editor, finance, atau peran direksi/komite). Donor
+              personal & perusahaan harus mendaftar sendiri lewat halaman registrasi.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
@@ -481,21 +589,26 @@ export default function UsersPage() {
               <Label>Password</Label>
               <Input
                 type="password"
-                placeholder="Minimal 6 karakter"
+                placeholder="Minimal 8 karakter"
                 value={newStaff.password}
                 onChange={(e) => setNewStaff({ ...newStaff, password: e.target.value })}
               />
             </div>
             <div>
               <Label>Peran</Label>
-              <Select value={newStaff.role} onValueChange={(value) => setNewStaff({ ...newStaff, role: value })}>
+              <Select
+                value={newStaff.role}
+                onValueChange={(value) => setNewStaff({ ...newStaff, role: value as UserRole })}
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="admin">Admin</SelectItem>
-                  <SelectItem value="editor">Editor</SelectItem>
-                  <SelectItem value="finance">Finance</SelectItem>
+                  {ORG_ROLE_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -503,7 +616,7 @@ export default function UsersPage() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setAddStaffDialog(false)}>Batal</Button>
             <Button onClick={handleAddStaff} disabled={!newStaff.name || !newStaff.email || !newStaff.password}>
-              Tambah Staf
+              Tambah Pengguna
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -633,5 +746,6 @@ export default function UsersPage() {
         </DialogContent>
       </Dialog>
     </div>
+    </PermissionGate>
   )
 }

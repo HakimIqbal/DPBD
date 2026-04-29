@@ -4,6 +4,7 @@ import { DataSource } from 'typeorm';
 import { AppModule } from './app.module';
 import { seedPrograms } from './seeds/program.seed';
 import { clearPrograms } from './seeds/clear-programs.seed';
+import { seedInvestments } from './seeds/investment.seed';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -72,6 +73,7 @@ async function bootstrap() {
     console.log('🌱 Starting database seed...');
     await clearPrograms(dataSource);  // Clear existing programs first
     await seedPrograms(dataSource);    // Then seed fresh 6 programs
+    await seedInvestments(dataSource); // Seed 6 sample investments (idempotent — skipped if rows exist)
     console.log('✅ Database seed completed successfully');
   } catch (error) {
     console.error('❌ Error during database seeding:', error);
