@@ -132,9 +132,65 @@ UI entry point: **Admin → User & Peran → Tambah Pengguna**
 `PermissionGate require={Permission.MANAGE_USERS}`, so only `admin` and `ceo`
 roles see the form.
 
-### Bootstrapping the first admin
+### Bootstrapping the first CEO
 
-Until there's a UI for it, promote the first admin in PostgreSQL directly:
+A fresh deployment has no users at all, so there's nobody who can hit the
+admin-gated `POST /api/admin/users/create` endpoint. The CEO is the
+"chicken-and-egg" account that breaks the loop: every other org account is
+created by an admin or CEO, and the CEO is created by bootstrap.
+
+**Auto-bootstrap (default, dev-friendly).** On every server start, the
+seed [`backend/src/seeds/bootstrap.seed.ts`](src/seeds/bootstrap.seed.ts)
+checks for any user with `role='ceo'`. If none exists, it creates one
+using these env vars (defaults shown):
+
+```
+CEO_BOOTSTRAP_EMAIL=ceo@dpbd.org
+CEO_BOOTSTRAP_PASSWORD=ChangeMe123!
+CEO_BOOTSTRAP_NAME=CEO DPBD
+```
+
+The bootstrap is **idempotent** — once a CEO exists, every subsequent
+start skips the seed silently. It also refuses to clobber an existing
+non-CEO user at the same email (logs a warning and bails).
+
+A `CEO_BOOTSTRAP` audit log row (entityType `User`) is written for the
+creation so the event is traceable.
+
+**Manual / production-safe path.** When auto-seed is undesirable
+(production deployments often disable seeds), run the standalone script:
+
+```bash
+cd backend
+npx ts-node src/scripts/create-ceo.ts
+```
+
+It reads the same env vars and the same idempotent logic. Exits 0 on
+success or no-op, non-zero only on DB/hashing errors.
+
+**Changing CEO credentials after bootstrap.** The default password
+(`ChangeMe123!`) is intentionally weak so you can sign in once. Rotate it
+immediately:
+
+1. Log in as the bootstrapped CEO.
+2. `PATCH /api/users/profile` (or the admin UI's profile page) with a new
+   strong password.
+3. To rename or move the email, an existing admin/CEO can use
+   `PATCH /api/users/:id` against the bootstrapped account.
+
+To re-bootstrap from scratch (e.g. after wiping users), set new values in
+`.env` and either restart the server or run the standalone script.
+
+> ⚠️ **Production warning:** never deploy with the default
+> `CEO_BOOTSTRAP_PASSWORD`. Override it via env *before* first start, then
+> have the CEO change it again right after first login. The default exists
+> only so a zero-config dev environment Just Works.
+
+### Bootstrapping additional admins
+
+Once the CEO exists, all org accounts (including additional admins) flow
+through the admin-create endpoint above. If you ever need to promote an
+existing user out-of-band, fall back to SQL:
 
 ```sql
 UPDATE users SET role = 'admin' WHERE email = 'you@example.com';

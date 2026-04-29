@@ -7,6 +7,7 @@ import { clearPrograms } from './seeds/clear-programs.seed';
 import { seedInvestments } from './seeds/investment.seed';
 import { seedNews } from './seeds/news.seed';
 import { seedRiskThresholds } from './seeds/risk-thresholds.seed';
+import { bootstrapCEO } from './seeds/bootstrap.seed';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -82,6 +83,16 @@ async function bootstrap() {
   } catch (error) {
     console.error('❌ Error during database seeding:', error);
     // Continue app startup even if seeding fails, but log the error
+  }
+
+  // CEO bootstrap runs in its own try/catch (separate from the seed block)
+  // so a CEO-account problem can't mask a seed problem and vice versa.
+  // Bootstrap failure must NEVER prevent server start — log loud and move on.
+  try {
+    const dataSource = app.get(DataSource);
+    await bootstrapCEO(dataSource);
+  } catch (error) {
+    console.error('❌ CEO bootstrap failed (non-fatal, continuing startup):', error);
   }
 
   const port = process.env.PORT || 3001;
