@@ -323,6 +323,18 @@ export function TransparencySection() {
             Kami berkomitmen untuk transparansi penuh. Pantau aliran dana masuk dan penyaluran secara real-time melalui
             dashboard publik.
           </p>
+          {/*
+            Endowment principle reminder. Keeps the donor's mental model
+            consistent with the EndowmentSection at the top of the page —
+            transparency here is about how the *imbal hasil* flows, the
+            corpus stays untouched.
+          */}
+          <div className="mt-6 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#D4C896]/15 border border-[#D4C896]/40 text-sm">
+            <span className="w-2 h-2 rounded-full bg-[#D4C896]" aria-hidden />
+            <span className="text-[#5C1515] font-medium">
+              Dana pokok tidak pernah digunakan — hanya imbal hasil yang disalurkan ke program
+            </span>
+          </div>
         </div>
 
         <TransparencyCharts />

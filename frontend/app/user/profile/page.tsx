@@ -13,6 +13,25 @@ import { Save, Upload, Building2, User, Loader2 } from "lucide-react"
 import { usersApi } from "@/lib/api"
 import { useToast } from "@/hooks/use-toast"
 
+/**
+ * Profile shape consumed by this page. Mirrors the User entity fields
+ * we display, all optional because the API may omit any of them
+ * depending on the user's role (company-only fields are absent for
+ * personal accounts and vice-versa).
+ */
+interface ProfileResponse {
+  name?: string
+  email?: string
+  country?: string
+  companyCountry?: string
+  companyName?: string
+  npwp?: string
+  picName?: string
+  companyAddress?: string
+  phone?: string
+  website?: string
+}
+
 const COUNTRIES = [
   "Indonesia",
   "Jerman",
@@ -54,7 +73,7 @@ export default function ProfilePage() {
       
       setLoading(true)
       try {
-        const profile = await usersApi.getProfile()
+        const profile = (await usersApi.getProfile()) as ProfileResponse | null
         if (profile) {
           setFormData({
             name: profile.name || "",

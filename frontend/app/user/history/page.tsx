@@ -40,8 +40,10 @@ export default function HistoryPage() {
     const fetchDonations = async () => {
       try {
         setLoading(true)
-        const data = await donationsApi.getAll()
-        setDonations(data || [])
+        // `donationsApi.getAll()` is generically typed `T | null`; cast
+        // through `unknown` to the array shape we expect.
+        const data = (await donationsApi.getAll()) as Donation[] | null
+        setDonations(data ?? [])
       } catch (error) {
         console.error('Error fetching donations:', error)
         toast({

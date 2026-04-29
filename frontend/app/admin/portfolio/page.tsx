@@ -266,6 +266,19 @@ async function createInvestment(payload: Record<string, unknown>): Promise<Inves
   return (await res.json()) as Investment
 }
 
+async function patchInvestment(
+  id: string,
+  payload: Record<string, unknown>,
+): Promise<Investment> {
+  const res = await fetch(`${API_BASE_URL}/investments/${id}`, {
+    method: "PATCH",
+    headers: authHeaders(),
+    body: JSON.stringify(payload),
+  })
+  if (!res.ok) throw new Error(await readApiError(res))
+  return (await res.json()) as Investment
+}
+
 async function postTransaction(
   investmentId: string,
   payload: Record<string, unknown>,
@@ -324,6 +337,10 @@ export default function PortfolioPage() {
   // Add-transaction dialog state. The id (when non-null) doubles as the
   // open flag and tells the dialog which investment to POST against.
   const [txnDialogId, setTxnDialogId] = useState<string | null>(null)
+
+  // Edit-investment dialog state. Same id-as-open-flag pattern as
+  // txnDialogId so opening the dialog from a row click is one set call.
+  const [editInvestmentId, setEditInvestmentId] = useState<string | null>(null)
 
   const loadSummary = useCallback(async () => {
     setSummaryLoading(true)
@@ -464,11 +481,24 @@ export default function PortfolioPage() {
     await Promise.all([loadSummary(), loadInvestmentDetail(investmentId)])
   }
 
-  function handleEditPlaceholder(name: string) {
+  /**
+   * Refresh path after a successful PATCH /investments/:id. Mirrors the
+   * "transaction created" handler: refresh summary aggregates AND the
+   * specific investment row, drop expansion cache for that id so the
+   * detail panel shows the up-to-date journal next time it opens.
+   */
+  async function handleEditUpdated(investmentId: string) {
+    setEditInvestmentId(null)
     toast({
-      title: "Belum tersedia",
-      description: `Form edit untuk ${name} akan dibuat di iterasi berikutnya.`,
+      title: "Sukses",
+      description: "Investasi berhasil diperbarui",
     })
+    setTransactionCache((prev) => {
+      const next = new Map(prev)
+      next.delete(investmentId)
+      return next
+    })
+    await Promise.all([loadSummary(), loadInvestments()])
   }
 
   return (
@@ -515,7 +545,7 @@ export default function PortfolioPage() {
           canEdit={canWrite}
           onToggleExpand={handleToggleExpand}
           onPageChange={setTablePage}
-          onEditClick={handleEditPlaceholder}
+          onEditClick={(id) => setEditInvestmentId(id)}
           onAddTransactionClick={(id) => setTxnDialogId(id)}
         />
 
@@ -538,6 +568,23 @@ export default function PortfolioPage() {
             if (!open) setTxnDialogId(null)
           }}
           onCreated={handleTransactionCreated}
+        />
+
+        {/*
+          Edit Investasi dialog — same id-as-open-flag pattern. We pass the
+          full investment object (looked up from the table data) so the form
+          can pre-fill synchronously without a separate detail fetch.
+        */}
+        <EditInvestmentDialog
+          investment={
+            editInvestmentId
+              ? investments.find((i) => i.id === editInvestmentId) ?? null
+              : null
+          }
+          onOpenChange={(open) => {
+            if (!open) setEditInvestmentId(null)
+          }}
+          onUpdated={handleEditUpdated}
         />
       </div>
     </PermissionGate>
@@ -915,7 +962,7 @@ interface InvestmentsTableProps {
   canEdit: boolean
   onToggleExpand: (id: string) => void
   onPageChange: (page: number) => void
-  onEditClick: (name: string) => void
+  onEditClick: (id: string) => void
   onAddTransactionClick: (id: string) => void
 }
 
@@ -1000,7 +1047,7 @@ function InvestmentsTable({
                     expansionLoading={expansionLoading.has(inv.id)}
                     canEdit={canEdit}
                     onToggle={() => onToggleExpand(inv.id)}
-                    onEdit={() => onEditClick(inv.name)}
+                    onEdit={() => onEditClick(inv.id)}
                     onAddTransaction={() => onAddTransactionClick(inv.id)}
                   />
                 ))}
@@ -1779,6 +1826,375 @@ function AddTransactionDialog({
             <Button type="submit" disabled={isSubmitting} className="gap-2">
               {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
               Simpan Transaksi
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// ============================================================================
+// Edit Investasi dialog
+// ============================================================================
+
+const EDITABLE_STATUSES = ["active", "matured", "liquidated"] as const
+type EditableStatus = (typeof EDITABLE_STATUSES)[number]
+
+const STATUS_LABEL_FOR_EDIT: Record<EditableStatus, string> = {
+  active: "Aktif",
+  matured: "Jatuh Tempo",
+  liquidated: "Dilikuidasi",
+}
+
+/**
+ * Edit form schema. Mirrors the create schema but adds an optional `status`
+ * field. `instrumentType` is included for type round-trip but the UI keeps
+ * it disabled — once an investment is purchased, its asset class is fixed
+ * (a reksa-dana row does not become a sukuk row via PATCH).
+ */
+const editFormSchema = z
+  .object({
+    name: z.string().trim().min(1, "Nama wajib diisi"),
+    instrumentType: z.enum(INSTRUMENT_TYPES, {
+      errorMap: () => ({ message: "Jenis tidak valid" }),
+    }),
+    institution: z.string().trim().min(1, "Institusi wajib diisi"),
+    principalAmount: z.coerce
+      .number({ invalid_type_error: "Harus berupa angka" })
+      .min(0, "Minimal 0"),
+    currentValue: z.coerce
+      .number({ invalid_type_error: "Harus berupa angka" })
+      .min(0, "Minimal 0"),
+    purchaseDate: z.string().min(1, "Tanggal pembelian wajib diisi"),
+    maturityDate: z.string().optional().or(z.literal("")),
+    expectedReturnRate: z
+      .union([
+        z.literal(""),
+        z.coerce
+          .number({ invalid_type_error: "Harus berupa angka" })
+          .min(0, "Minimal 0")
+          .max(100, "Maksimal 100"),
+      ])
+      .optional(),
+    notes: z.string().optional().or(z.literal("")),
+    status: z.enum(EDITABLE_STATUSES).optional(),
+  })
+  .superRefine((val, ctx) => {
+    if (
+      val.maturityDate &&
+      val.maturityDate !== "" &&
+      new Date(val.maturityDate) < new Date(val.purchaseDate)
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["maturityDate"],
+        message: "Tanggal jatuh tempo tidak boleh sebelum tanggal pembelian",
+      })
+    }
+  })
+
+type EditFormValues = z.infer<typeof editFormSchema>
+
+interface EditDialogProps {
+  /** Non-null = dialog open, scoped to that investment. */
+  investment: Investment | null
+  onOpenChange: (open: boolean) => void
+  onUpdated: (investmentId: string) => void | Promise<void>
+}
+
+/**
+ * Pre-fill values lifted from an Investment row. Called once on dialog open
+ * (and again if the consumer somehow swaps the row beneath us) via reset().
+ */
+function valuesFromInvestment(investment: Investment): EditFormValues {
+  return {
+    name: investment.name,
+    instrumentType: investment.instrumentType as EditFormValues["instrumentType"],
+    institution: investment.institution,
+    principalAmount: toNumber(investment.principalAmount),
+    currentValue: toNumber(investment.currentValue),
+    purchaseDate: investment.purchaseDate.slice(0, 10),
+    maturityDate: investment.maturityDate ? investment.maturityDate.slice(0, 10) : "",
+    expectedReturnRate:
+      investment.expectedReturnRate !== null && investment.expectedReturnRate !== undefined
+        ? Number(investment.expectedReturnRate)
+        : "",
+    notes: investment.notes ?? "",
+    status: investment.status as EditableStatus,
+  }
+}
+
+function EditInvestmentDialog({ investment, onOpenChange, onUpdated }: EditDialogProps) {
+  const { toast } = useToast()
+  const isOpen = investment !== null
+  // Liquidated rows are terminal — hide the status dropdown so admins can't
+  // accidentally un-liquidate. Other status mutations on a liquidated row
+  // are also rejected by the backend's transaction guard.
+  const showStatusField = investment !== null && investment.status !== "liquidated"
+
+  const {
+    register,
+    handleSubmit,
+    control,
+    reset,
+    formState: { errors, isSubmitting },
+  } = useForm<EditFormValues>({
+    resolver: zodResolver(editFormSchema),
+    defaultValues: {
+      name: "",
+      instrumentType: undefined as unknown as EditFormValues["instrumentType"],
+      institution: "",
+      principalAmount: undefined as unknown as number,
+      currentValue: undefined as unknown as number,
+      purchaseDate: "",
+      maturityDate: "",
+      expectedReturnRate: "",
+      notes: "",
+      status: undefined,
+    },
+  })
+
+  // Repopulate the form whenever a new investment is loaded into the dialog.
+  // Watching `investment?.id` (and `investment?.updatedAt` for safety) means
+  // a refresh-then-reopen on the same row picks up fresh values.
+  useEffect(() => {
+    if (investment) {
+      reset(valuesFromInvestment(investment))
+    } else {
+      // Closing → blank the form so reopening on a different row starts clean.
+      reset({
+        name: "",
+        instrumentType: undefined as unknown as EditFormValues["instrumentType"],
+        institution: "",
+        principalAmount: undefined as unknown as number,
+        currentValue: undefined as unknown as number,
+        purchaseDate: "",
+        maturityDate: "",
+        expectedReturnRate: "",
+        notes: "",
+        status: undefined,
+      })
+    }
+  }, [investment?.id, investment?.updatedAt, investment, reset])
+
+  async function onSubmit(values: EditFormValues) {
+    if (!investment) return
+
+    try {
+      // Build the patch body. We send all fields the user can edit so the
+      // backend's diff-based audit log captures every field's before/after
+      // accurately. instrumentType is intentionally omitted from the
+      // payload (read-only on the UI), so a stray value can't sneak past.
+      const payload: Record<string, unknown> = {
+        name: values.name.trim(),
+        institution: values.institution.trim(),
+        principalAmount: values.principalAmount,
+        currentValue: values.currentValue,
+        purchaseDate: values.purchaseDate,
+      }
+
+      if (values.maturityDate && values.maturityDate !== "") {
+        payload.maturityDate = values.maturityDate
+      }
+      if (values.expectedReturnRate !== undefined && values.expectedReturnRate !== "") {
+        payload.expectedReturnRate = values.expectedReturnRate
+      }
+      if (values.notes !== undefined) {
+        // Send empty string explicitly so user can clear notes — backend
+        // treats it as "set to empty" rather than "leave unchanged".
+        payload.notes = values.notes.trim()
+      }
+      if (showStatusField && values.status) {
+        payload.status = values.status
+      }
+
+      await patchInvestment(investment.id, payload)
+      await onUpdated(investment.id)
+    } catch (e) {
+      toast({
+        title: "Error",
+        description: e instanceof Error ? e.message : "Gagal memperbarui investasi",
+        variant: "destructive",
+      })
+    }
+  }
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Edit Investasi</DialogTitle>
+          <DialogDescription>
+            {investment ? (
+              <>
+                Memperbarui data{" "}
+                <span className="font-medium text-foreground">{investment.name}</span>.
+                Untuk perubahan nilai pasar atau likuidasi, gunakan{" "}
+                <span className="font-medium">Tambah Transaksi</span> agar journal-nya
+                tercatat.
+              </>
+            ) : (
+              "Memperbarui data investasi."
+            )}
+          </DialogDescription>
+        </DialogHeader>
+
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Field label="Nama instrumen" error={errors.name?.message} required>
+              <Input
+                placeholder="mis. Reksa Dana Syariah Mandiri Seri 1"
+                {...register("name")}
+              />
+            </Field>
+
+            <Field
+              label="Jenis instrumen"
+              error={errors.instrumentType?.message}
+              hint="Tidak dapat diubah setelah investasi tercatat"
+            >
+              {/*
+                Read-only by spec — instrument type defines the asset class
+                and shouldn't change retroactively. Render the same Select
+                widget so the UI looks consistent, but disabled. Field is
+                still in the form values for round-trip but we omit it from
+                the PATCH payload to keep the contract honest.
+              */}
+              <Controller
+                name="instrumentType"
+                control={control}
+                render={({ field }) => (
+                  <Select value={field.value ?? ""} disabled>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {INSTRUMENT_TYPES.map((t) => (
+                        <SelectItem key={t} value={t}>
+                          {TYPE_LABELS[t]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+            </Field>
+          </div>
+
+          <Field label="Institusi" error={errors.institution?.message} required>
+            <Input
+              placeholder="mis. Bank Mandiri Syariah, Pemerintah RI"
+              {...register("institution")}
+            />
+          </Field>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Field label="Dana awal (IDR)" error={errors.principalAmount?.message} required>
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="100000000"
+                {...register("principalAmount", { valueAsNumber: true })}
+              />
+            </Field>
+
+            <Field
+              label="Nilai sekarang (IDR)"
+              error={errors.currentValue?.message}
+              required
+              hint="Untuk mark-to-market reguler, gunakan Tambah Transaksi → Update Nilai"
+            >
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="100000000"
+                {...register("currentValue", { valueAsNumber: true })}
+              />
+            </Field>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Field label="Tanggal pembelian" error={errors.purchaseDate?.message} required>
+              <Input type="date" {...register("purchaseDate")} />
+            </Field>
+
+            <Field label="Tanggal jatuh tempo" error={errors.maturityDate?.message}>
+              <Input type="date" {...register("maturityDate")} />
+            </Field>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Field
+              label="Expected return rate (% p.a.)"
+              error={errors.expectedReturnRate?.message as string | undefined}
+              hint="Kosongkan jika tidak punya rate tetap"
+            >
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                max="100"
+                placeholder="6.50"
+                {...register("expectedReturnRate")}
+              />
+            </Field>
+
+            {/*
+              Status dropdown only renders when current status is not
+              liquidated. Once liquidated the row is terminal and edits
+              cannot un-liquidate; the field disappearing is the cleanest
+              way to communicate that constraint.
+            */}
+            {showStatusField && (
+              <Field label="Status" error={errors.status?.message}>
+                <Controller
+                  name="status"
+                  control={control}
+                  render={({ field }) => (
+                    <Select
+                      value={field.value ?? ""}
+                      onValueChange={(v) => field.onChange(v as EditableStatus)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Pilih status…" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {EDITABLE_STATUSES.map((s) => (
+                          <SelectItem key={s} value={s}>
+                            {STATUS_LABEL_FOR_EDIT[s]}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+              </Field>
+            )}
+          </div>
+
+          <Field label="Catatan" error={errors.notes?.message}>
+            <Textarea
+              placeholder="Catatan tambahan (opsional)…"
+              rows={3}
+              {...register("notes")}
+            />
+          </Field>
+
+          <DialogFooter className="pt-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              disabled={isSubmitting}
+            >
+              Batal
+            </Button>
+            <Button type="submit" disabled={isSubmitting} className="gap-2">
+              {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
+              Simpan Perubahan
             </Button>
           </DialogFooter>
         </form>

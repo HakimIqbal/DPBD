@@ -46,12 +46,13 @@ export default function ProgramDetailPage() {
   const fetchProgram = async () => {
     setLoading(true)
     try {
-      // Try to fetch by slug (ID)
-      const programData = await programsApi.getById(slug)
+      // `programsApi.getById/getStats` are generically typed `T | null`;
+      // cast through `unknown` so strict mode accepts the assignment.
+      // The runtime shape is enforced by the backend response, not the type.
+      const programData = (await programsApi.getById(slug)) as Program | null
       setProgram(programData)
 
-      // Fetch stats
-      const statsData = await programsApi.getStats(slug)
+      const statsData = (await programsApi.getStats(slug)) as Stats | null
       setStats(statsData)
     } catch (error) {
       console.error('Error fetching program:', error)

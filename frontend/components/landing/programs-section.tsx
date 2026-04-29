@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { ArrowRight } from "lucide-react"
+import { ArrowRight, Sparkles } from "lucide-react"
 
 interface Program {
   id: string
@@ -43,6 +43,18 @@ function ProgramCard({ program }: { program: Program }) {
       </div>
       {/* Content */}
       <div className="p-5">
+        {/*
+          Funding-source badge — appears on every program card. The point
+          here is to drive home, at a glance, that this isn't another
+          social-crowdfunding platform: programs are funded by the imbal
+          hasil of the endowment, not by spending the donor principal.
+          Pairs visually with the EndowmentSection above (same Sparkles
+          icon, same "imbal hasil" wording).
+        */}
+        <span className="inline-flex items-center gap-1.5 mb-3 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-[11px] font-medium">
+          <Sparkles className="w-3 h-3" aria-hidden />
+          Didanai dari imbal hasil investasi
+        </span>
         <h3 className="text-base font-semibold text-gray-900 mb-2 group-hover:text-[#5C1515] transition-colors">
           {program.title}
         </h3>

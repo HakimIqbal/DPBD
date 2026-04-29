@@ -9,6 +9,8 @@ import type {
   DonationTrend,
   PaymentMethodStats,
   RecentDonation,
+  EndowmentSummary,
+  PublicStats,
 } from './analytics.service';
 
 @Controller('analytics')
@@ -33,6 +35,32 @@ export class AnalyticsController {
   @Get('programs')
   async getProgramsPerformance(): Promise<ProgramPerformance[]> {
     return await this.analyticsService.getProgramsPerformance();
+  }
+
+  /**
+   * Public endowment-fund summary for the landing page. NO auth guard —
+   * follows the same pattern as `/analytics/programs`, `/analytics/trends`,
+   * and `/analytics/recent`. The data here is intentionally aggregate-only
+   * (no per-investment detail) so we don't leak portfolio composition to
+   * unauthenticated visitors beyond the high-level allocation pie.
+   * GET /analytics/endowment
+   */
+  @Get('endowment')
+  async getEndowmentSummary(): Promise<EndowmentSummary> {
+    return await this.analyticsService.getEndowmentSummary();
+  }
+
+  /**
+   * Public donation stats for the landing-page hero (Donatur, Total Donasi,
+   * Program Aktif). NO auth guard — these are aggregate counters that we
+   * already happily display in publicly-visible UI, so this is a slim
+   * "safe-for-anon" surface that replaces the auth-locked
+   * `/analytics/dashboard` for landing consumers.
+   * GET /analytics/public-stats
+   */
+  @Get('public-stats')
+  async getPublicStats(): Promise<PublicStats> {
+    return await this.analyticsService.getPublicStats();
   }
 
   /**

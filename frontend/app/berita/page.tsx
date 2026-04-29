@@ -11,8 +11,10 @@ import { ArrowLeft, Calendar, User, Clock, Search, Filter } from "lucide-react"
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api"
 
-// Default news data - fallback if API is unavailable
-const DEFAULT_NEWS_ITEMS = [
+// Default news data - fallback if API is unavailable.
+// Each entry conforms to the NewsItem shape declared below; ids are
+// synthesised from slugs so React can key the list deterministically.
+const DEFAULT_NEWS_ITEMS: NewsItem[] = [
   {
     title: "Penyaluran Beasiswa Semester Genap 2024 untuk 150 Mahasiswa",
     excerpt: "DPBD berhasil menyalurkan beasiswa kepada 150 mahasiswa Indonesia yang sedang menempuh pendidikan di berbagai negara.",
@@ -120,7 +122,10 @@ DPBD berencana memperluas program ini ke kota-kota lain di tahun depan.`,
 const categories = ["Semua", "Beasiswa", "UMKM", "Bantuan Darurat", "Pendidikan", "Transparansi"]
 
 type NewsItem = {
-  id: string
+  // Optional because the bundled DEFAULT_NEWS_ITEMS fallback list doesn't
+  // synthesise ids — only API-sourced rows carry one. The component keys
+  // off `slug`, not `id`, so this is safe.
+  id?: string
   title: string
   excerpt: string
   content: string
@@ -149,8 +154,10 @@ export default function BeritaPage() {
           const data = await response.json()
           const newsArray = Array.isArray(data) ? data : data.data || []
           
-          // Transform API data to match component format
-          const transformedNews = newsArray
+          // Transform API data to match component format. Annotated as
+          // NewsItem[] so the downstream `[...new Set(...).map((n) => n.category)]`
+          // narrows back to `string[]` instead of `unknown[]`.
+          const transformedNews: NewsItem[] = newsArray
             .filter((item: any) => item.isPublished !== false)
             .map((item: any) => ({
               id: item.id,
@@ -172,8 +179,14 @@ export default function BeritaPage() {
           if (transformedNews.length > 0) {
             setAllNewsItems(transformedNews)
             
-            // Extract unique categories
-            const uniqueCategories = ["Semua", ...new Set(transformedNews.map((n: NewsItem) => n.category))]
+            // Extract unique categories. Cast through `unknown` because
+            // `transformedNews` came from `(item: any) => NewsItem`-shaped
+            // mapping, so TypeScript doesn't narrow the inner Set members
+            // back to `string` automatically.
+            const uniqueCategories: string[] = [
+              "Semua",
+              ...new Set(transformedNews.map((n: NewsItem) => n.category)),
+            ]
             setCategories(uniqueCategories)
           }
         }
@@ -276,7 +289,7 @@ export default function BeritaPage() {
                 {/* Image */}
                 <div className="relative aspect-[16/9] overflow-hidden">
                   <Image
-                    src={news.image}
+                    src={news.image ?? "/news-placeholder.jpg"}
                     alt={news.title}
                     fill
                     className="object-cover group-hover:scale-110 transition-transform duration-700"
@@ -337,7 +350,7 @@ export default function BeritaPage() {
               {/* Hero Image */}
               <div className="relative h-64 overflow-hidden rounded-t-lg">
                 <Image
-                  src={selectedNews.image}
+                  src={selectedNews.image ?? "/news-placeholder.jpg"}
                   alt={selectedNews.title}
                   fill
                   className="object-cover"

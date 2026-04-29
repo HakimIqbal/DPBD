@@ -1,8 +1,33 @@
+"use client"
+
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { HelpCircle } from "lucide-react"
 
-const faqs = [
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api"
+
+interface FaqItem {
+  question: string
+  answer: string
+}
+
+/** Backend FAQ shape (matches `Faq` entity in backend/src/entities/faq.entity.ts). */
+interface BackendFaq {
+  id: string
+  question: string
+  answer: string
+  category?: string | null
+  displayOrder?: number
+  isActive: boolean
+}
+
+/**
+ * Hardcoded fallback. Used when the backend is unreachable, returns no
+ * rows, or returns malformed data. Keeping this list lets the landing
+ * page survive an API outage without showing an empty FAQ section.
+ */
+const FALLBACK_FAQS: FaqItem[] = [
   {
     question: "Apa itu DPBD?",
     answer:
@@ -41,6 +66,57 @@ const faqs = [
 ]
 
 export function FaqSection() {
+  // Render fallback synchronously so the section is never blank, even on
+  // the first paint before the API response lands. The effect below
+  // upgrades to backend data once it arrives — and silently keeps the
+  // fallback if the API is unreachable.
+  const [faqs, setFaqs] = useState<FaqItem[]>(FALLBACK_FAQS)
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function load() {
+      try {
+        const res = await fetch(`${API_BASE_URL}/faqs`)
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const json: unknown = await res.json()
+
+        // The endpoint may return an array directly or wrap in { data: [...] }.
+        // Be permissive — defensive shape detection lets us survive minor
+        // backend evolutions without breaking the public landing.
+        const rows: BackendFaq[] = Array.isArray(json)
+          ? (json as BackendFaq[])
+          : Array.isArray((json as { data?: unknown }).data)
+            ? ((json as { data: BackendFaq[] }).data)
+            : []
+
+        const cleaned = rows
+          // Defense in depth: backend's findAll(true) already filters by
+          // isActive, but if that ever changes we still respect the flag.
+          .filter((r) => r && r.isActive && r.question && r.answer)
+          .sort(
+            (a, b) =>
+              (a.displayOrder ?? 0) - (b.displayOrder ?? 0),
+          )
+          .map((r) => ({ question: r.question, answer: r.answer }))
+
+        if (!cancelled && cleaned.length > 0) {
+          setFaqs(cleaned)
+        }
+        // If cleaned is empty, leave the fallback in place — the user
+        // sees a populated FAQ section rather than an empty card.
+      } catch (err) {
+        // Silent: keep the fallback list. Log for debugging.
+        console.error("[FaqSection] fetch failed, keeping fallback:", err)
+      }
+    }
+
+    void load()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   return (
     <section id="faq" className="py-20 md:py-28 bg-[#f8f7f4]">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">

@@ -15,12 +15,31 @@ import { ArrowLeft, ArrowRight, Heart, GraduationCap, Check, User, Building2, Us
 import { programsApi } from "@/lib/api"
 import { useToast } from "@/hooks/use-toast"
 
+/**
+ * Hybrid Program shape — accommodates both the canonical API response
+ * (`title`, `image`, `targetAmount`, `collectedAmount`) AND the legacy
+ * display-side aliases the JSX in this page reads (`name`, `icon`,
+ * `target`, `raised`). The API doesn't currently emit the display
+ * aliases, so the destructured calls below all use null-coalescing
+ * fallbacks to bridge the two shapes.
+ */
+import type { LucideIcon } from "lucide-react"
+
 interface Program {
   id: string
-  title: string
-  targetAmount: number
-  raisedAmount: number
-  category: string
+  // API-canonical fields
+  title?: string
+  image?: string
+  targetAmount?: number
+  collectedAmount?: number
+  category?: string
+  status?: string
+  // Display-side aliases (may be missing from the API response)
+  name?: string
+  icon?: LucideIcon
+  target?: number
+  raised?: number
+  donors?: number
 }
 
 const nominalOptions = [
@@ -58,9 +77,14 @@ function DonateContent() {
   useEffect(() => {
     const fetchPrograms = async () => {
       try {
-        const data = await programsApi.getAll()
-        // Filter only active programs
-        const activePrograms = data.filter((p: any) => p.status === 'active' || p.status === 'draft')
+        // `programsApi.getAll()` is generic-typed `T | null` and we
+        // know the shape — cast through `unknown` to satisfy strict
+        // mode without using `any`. Empty array on null keeps the
+        // null-check ergonomics minimal.
+        const data = (await programsApi.getAll()) as Program[] | null
+        const activePrograms = (data ?? []).filter(
+          (p) => p.status === "active" || p.status === "draft",
+        )
         setPrograms(activePrograms)
       } catch (error) {
         console.error('Error fetching programs:', error)
@@ -194,8 +218,17 @@ function DonateContent() {
                       className="space-y-3"
                     >
                       {programs.map((program) => {
-                        const Icon = program.icon
-                        const progress = (program.raised / program.target) * 100
+                        // The API returns canonical fields (title/image/
+                        // targetAmount/collectedAmount); the legacy aliases
+                        // (name/icon/raised/target) are missing. Fall back
+                        // to canonical fields so the UI renders meaningfully
+                        // either way. `GraduationCap` is a reasonable
+                        // generic icon for an unrecognised program.
+                        const Icon = program.icon ?? GraduationCap
+                        const raised = program.raised ?? program.collectedAmount ?? 0
+                        const target = program.target ?? program.targetAmount ?? 0
+                        const displayName = program.name ?? program.title ?? "Program"
+                        const progress = target > 0 ? (raised / target) * 100 : 0
                         return (
                           <label
                             key={program.id}
@@ -210,7 +243,7 @@ function DonateContent() {
                               <Icon className="w-5 h-5 text-primary" />
                             </div>
                             <div className="flex-1 min-w-0">
-                              <p className="font-medium">{program.name}</p>
+                              <p className="font-medium">{displayName}</p>
                               <div className="mt-2">
                                 <div className="flex justify-between text-sm mb-1">
                                   <span className="text-muted-foreground">Terkumpul</span>
@@ -218,7 +251,7 @@ function DonateContent() {
                                 </div>
                                 <Progress value={progress} className="h-2" />
                                 <p className="text-xs text-muted-foreground mt-1">
-                                  {formatCurrency(program.raised)} dari {formatCurrency(program.target)}
+                                  {formatCurrency(raised)} dari {formatCurrency(target)}
                                 </p>
                               </div>
                             </div>
@@ -447,15 +480,25 @@ function DonateContent() {
               </CardHeader>
               <CardContent className="space-y-4">
                 {selectedProgram ? (
-                  <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
-                    <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                      <selectedProgram.icon className="w-5 h-5 text-primary" />
-                    </div>
-                    <div>
-                      <p className="font-medium text-sm">{selectedProgram.name}</p>
-                      <p className="text-xs text-muted-foreground">Target: {formatCurrency(selectedProgram.target)}</p>
-                    </div>
-                  </div>
+                  (() => {
+                    // Same alias-fallback pattern as the program list above.
+                    const SidebarIcon = selectedProgram.icon ?? GraduationCap
+                    const sidebarName = selectedProgram.name ?? selectedProgram.title ?? "Program"
+                    const sidebarTarget = selectedProgram.target ?? selectedProgram.targetAmount ?? 0
+                    return (
+                      <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
+                        <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                          <SidebarIcon className="w-5 h-5 text-primary" />
+                        </div>
+                        <div>
+                          <p className="font-medium text-sm">{sidebarName}</p>
+                          <p className="text-xs text-muted-foreground">
+                            Target: {formatCurrency(sidebarTarget)}
+                          </p>
+                        </div>
+                      </div>
+                    )
+                  })()
                 ) : (
                   <p className="text-sm text-muted-foreground">Pilih program terlebih dahulu</p>
                 )}

@@ -83,18 +83,17 @@ export function ImpactSection() {
   const [loading, setLoading] = useState(true)
   const indicatorWidth = getIndicatorWidth(testimonials.length)
 
-  // Fetch real data from API
+  // Fetch impact stats from /api/analytics/dashboard. Testimonials stay
+  // hardcoded — `/api/feedback` was removed because there is no backend
+  // module behind it (the call was always 404'ing and silently falling
+  // back to defaults). When a real feedback module is built later, this
+  // is the place to wire it back in.
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [statsRes, feedbackRes] = await Promise.all([
-          fetch(`${API_BASE_URL}/analytics/dashboard`),
-          fetch(`${API_BASE_URL}/feedback`),
-        ])
-
+        const statsRes = await fetch(`${API_BASE_URL}/analytics/dashboard`)
         if (statsRes.ok) {
           const statsData = await statsRes.json()
-          // Build stats from API response
           if (statsData) {
             setImpactStats([
               { icon: Users, value: `${statsData.totalDonors || 2500}+`, label: "Donor Aktif" },
@@ -104,29 +103,13 @@ export function ImpactSection() {
             ])
           }
         }
-
-        if (feedbackRes.ok) {
-          const feedbackData = await feedbackRes.json()
-          const reviews = (Array.isArray(feedbackData) ? feedbackData : [])
-            .filter((f: any) => f.message || f.content)
-            .slice(0, 4)
-            .map((f: any) => ({
-              id: f.id,
-              quote: f.message || f.content || "",
-              name: f.name || f.user?.name || "Pengguna DPBD",
-              role: f.role || "Penerima Manfaat",
-              location: f.location || "Indonesia",
-              image: f.image || "/indonesian-male-entrepreneur-portrait.jpg",
-              rating: f.rating,
-            }))
-
-          if (reviews.length > 0) {
-            setTestimonials(reviews)
-          }
-        }
+        // /analytics/dashboard is currently RBAC-locked to admin/finance, so
+        // an anonymous landing visitor will hit 401 here. That's pre-existing
+        // behaviour — the section degrades gracefully to DEFAULT_IMPACT_STATS
+        // until either the endpoint is opened up or a public-stats variant
+        // is added.
       } catch (error) {
         console.error("Error fetching impact data:", error)
-        // Use defaults
       } finally {
         setLoading(false)
       }

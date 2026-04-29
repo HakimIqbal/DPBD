@@ -11,8 +11,32 @@ import { ArrowLeft, Search, Heart, Loader2 } from "lucide-react"
 import { programsApi } from "@/lib/api"
 import { useToast } from "@/hooks/use-toast"
 
+/**
+ * Loose Program shape used by this listing page. The API may return
+ * either the canonical entity (`title`/`image`/`collectedAmount`/
+ * `targetAmount`) or a legacy display shape (`raised`/`target`/`donors`),
+ * so all fields are optional and the JSX uses null-coalescing fallbacks.
+ */
+interface Program {
+  id: string
+  title?: string
+  description?: string
+  category?: string
+  image?: string
+  status?: string
+  targetAmount?: number
+  collectedAmount?: number
+  raised?: number
+  target?: number
+  donors?: number
+}
+
+interface PaginatedPrograms {
+  data?: Program[]
+}
+
 export default function ProgramsPage() {
-  const [programs, setPrograms] = useState<any[]>([])
+  const [programs, setPrograms] = useState<Program[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedCategory, setSelectedCategory] = useState("Semua")
@@ -23,10 +47,14 @@ export default function ProgramsPage() {
     const fetchPrograms = async () => {
       setLoading(true)
       try {
-        const data = await programsApi.getAll()
+        // `programsApi.getAll()` is generically typed `T | null`; cast
+        // through `unknown` to the union we expect (array OR { data: [] }
+        // pagination wrapper). Both shapes are observed in different
+        // versions of the backend.
+        const data = (await programsApi.getAll()) as Program[] | PaginatedPrograms | null
         if (Array.isArray(data)) {
           setPrograms(data)
-        } else if (data?.data) {
+        } else if (data && Array.isArray(data.data)) {
           setPrograms(data.data)
         }
       } catch (error) {
@@ -55,8 +83,17 @@ export default function ProgramsPage() {
     return matchesSearch && matchesCategory
   })
 
-  // Get unique categories from programs
-  const categories = ["Semua", ...new Set(programs.map((p) => p.category).filter(Boolean))]
+  // Get unique categories from programs. Use a type predicate on the
+  // filter so the resulting array narrows to `string[]` (the standard
+  // `Boolean` filter doesn't narrow `string | undefined → string`).
+  const categories: string[] = [
+    "Semua",
+    ...new Set(
+      programs
+        .map((p) => p.category)
+        .filter((c): c is string => typeof c === "string" && c.length > 0),
+    ),
+  ]
 
   if (loading) {
     return (
@@ -115,7 +152,7 @@ export default function ProgramsPage() {
                   <div className="relative h-48 bg-muted">
                     <Image
                       src={program.image}
-                      alt={program.title}
+                      alt={program.title ?? "Program"}
                       fill
                       className="object-cover"
                       onError={(e) => {

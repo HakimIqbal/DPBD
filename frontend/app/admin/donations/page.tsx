@@ -9,15 +9,45 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Search, Download, Filter, Eye, Calendar, ArrowDownToLine, CheckCircle, Clock, XCircle, Loader2 } from "lucide-react"
 
-const DEFAULT_DONATIONS: any[] = []
+/**
+ * Shape of a donation row as consumed by this admin page. The list is
+ * fetched from `/api/donations`, but the legacy view layer here also
+ * decorates rows with derived fields (gross/fee/net split, channel label,
+ * timeline). Treat as a UI-side superset of the backend Donation entity.
+ */
+interface DonationTimelineEntry {
+  time: string
+  label: string
+  status: string
+}
 
-const formatRupiah = (num: number) => {
-  return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(num)
+interface DonationRow {
+  id: string
+  orderId?: string
+  date?: string
+  donor?: string
+  donorType?: string
+  email?: string
+  program?: string
+  channel?: string
+  status: string
+  amount?: number
+  gross?: number
+  fee?: number
+  net?: number
+  notes?: string
+  timeline?: DonationTimelineEntry[]
+}
+
+const DEFAULT_DONATIONS: DonationRow[] = []
+
+const formatRupiah = (num: number | undefined) => {
+  return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(num ?? 0)
 }
 
 export default function DonationsPage() {
-  const [donations, setDonations] = useState<any[]>(DEFAULT_DONATIONS)
-  const [selectedTransaction, setSelectedTransaction] = useState<(typeof donations)[0] | null>(null)
+  const [donations, setDonations] = useState<DonationRow[]>(DEFAULT_DONATIONS)
+  const [selectedTransaction, setSelectedTransaction] = useState<DonationRow | null>(null)
   const [statusFilter, setStatusFilter] = useState("all")
   const [channelFilter, setChannelFilter] = useState("all")
   const [loading, setLoading] = useState(true)
@@ -54,12 +84,12 @@ export default function DonationsPage() {
 
   const filteredDonations = donations.filter((d) => {
     if (statusFilter !== "all" && d.status !== statusFilter) return false
-    if (channelFilter !== "all" && !d.channel.toLowerCase().includes(channelFilter.toLowerCase())) return false
+    if (channelFilter !== "all" && !(d.channel ?? "").toLowerCase().includes(channelFilter.toLowerCase())) return false
     return true
   })
 
   const stats = {
-    total: donations.reduce((sum, d) => sum + (d.status === "success" ? d.net : 0), 0),
+    total: donations.reduce((sum, d) => sum + (d.status === "success" ? (d.net ?? 0) : 0), 0),
     success: donations.filter((d) => d.status === "success").length,
     pending: donations.filter((d) => d.status === "pending").length,
     failed: donations.filter((d) => d.status === "failed").length,
@@ -317,7 +347,7 @@ export default function DonationsPage() {
               <div>
                 <p className="text-sm font-medium mb-3">Timeline</p>
                 <div className="space-y-3">
-                  {selectedTransaction.timeline.map((item, i) => (
+                  {(selectedTransaction.timeline ?? []).map((item, i) => (
                     <div key={i} className="flex items-center gap-3">
                       <div
                         className={`w-2 h-2 rounded-full ${

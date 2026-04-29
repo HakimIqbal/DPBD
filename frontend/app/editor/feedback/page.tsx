@@ -31,8 +31,37 @@ import {
 } from "lucide-react"
 import { getInitials, getAvatarColor } from "@/lib/avatar-utils"
 
+/**
+ * Single testimonial/feedback record. The mock list below contains rows in
+ * various lifecycle states — explicitly typing the array as `Feedback[]`
+ * (rather than letting TS infer narrow object-literal types) means
+ * subsequent state updates (e.g. flipping a `pending` row to `approved`
+ * with a fresh `approvedAt`) don't fail the type-checker.
+ *
+ * Notable shape choices:
+ *   - `photo: string | null`  — one rejected entry has photo: null.
+ *   - `status` widened to a string union covering all three states.
+ *   - `approvedAt` / `rejectedAt` / `rejectedReason` are optional and
+ *     populated only after the corresponding state transition.
+ */
+interface Feedback {
+  id: number
+  name: string
+  email: string
+  phone: string
+  category: string
+  location: string
+  testimonial: string
+  photo: string | null
+  status: "pending" | "approved" | "rejected"
+  submittedAt: string
+  approvedAt?: string
+  rejectedAt?: string
+  rejectedReason?: string
+}
+
 // Mock data for feedback/testimonials
-const mockFeedback = [
+const mockFeedback: Feedback[] = [
   {
     id: 1,
     name: "Andi Pratama",
@@ -103,7 +132,8 @@ const mockFeedback = [
   },
 ]
 
-type Feedback = (typeof mockFeedback)[0]
+// `Feedback` interface is declared above the mock array; consumers pick
+// it up via the explicitly-typed `Feedback[]` annotation on mockFeedback.
 
 export default function EditorFeedbackPage() {
   const [feedback, setFeedback] = useState(mockFeedback)
