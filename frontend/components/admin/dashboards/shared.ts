@@ -156,3 +156,49 @@ export async function fetchActiveAlerts(): Promise<Paginated<RiskAlert>> {
   if (!res.ok) throw new Error(await readApiError(res))
   return (await res.json()) as Paginated<RiskAlert>
 }
+
+/** Mirrors backend `DisbursementListItem` (disbursements.service.ts). */
+export interface PendingDisbursement {
+  id: string
+  status: "pending" | "approved" | "rejected" | "process" | "completed"
+  amount: number
+  recipient: string
+  description: string | null
+  programId: string
+  programName: string
+  requestedById: string | null
+  requestedByName: string | null
+  requestedByEmail: string | null
+  requestedAt: string | null
+  reviewedById: string | null
+  reviewedAt: string | null
+  rejectionReason: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export async function fetchPendingDisbursements(): Promise<PendingDisbursement[]> {
+  const res = await fetch(`${API_BASE_URL}/disbursements/pending`, {
+    headers: authHeaders(),
+  })
+  if (!res.ok) throw new Error(await readApiError(res))
+  return (await res.json()) as PendingDisbursement[]
+}
+
+export async function approveDisbursement(id: string): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/disbursements/${id}/approve`, {
+    method: "PATCH",
+    headers: authHeaders(),
+    body: JSON.stringify({}),
+  })
+  if (!res.ok) throw new Error(await readApiError(res))
+}
+
+export async function rejectDisbursement(id: string, reason: string): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/disbursements/${id}/reject`, {
+    method: "PATCH",
+    headers: authHeaders(),
+    body: JSON.stringify({ reason }),
+  })
+  if (!res.ok) throw new Error(await readApiError(res))
+}

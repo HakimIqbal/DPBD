@@ -8,6 +8,7 @@ import { seedInvestments } from './seeds/investment.seed';
 import { seedNews } from './seeds/news.seed';
 import { seedRiskThresholds } from './seeds/risk-thresholds.seed';
 import { bootstrapCEO } from './seeds/bootstrap.seed';
+import { seedDisbursements } from './seeds/disbursements.seed';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -79,6 +80,7 @@ async function bootstrap() {
     await seedInvestments(dataSource); // Seed 6 sample investments (idempotent — skipped if rows exist)
     await seedNews(dataSource);        // Seed 3 published news articles (idempotent — skipped if rows exist)
     await seedRiskThresholds(dataSource); // Seed 3 default risk thresholds (idempotent — skipped if rows exist)
+    await seedDisbursements(dataSource);  // Seed 3 pending disbursements for CFO queue demo (idempotent)
     console.log('✅ Database seed completed successfully');
   } catch (error) {
     console.error('❌ Error during database seeding:', error);

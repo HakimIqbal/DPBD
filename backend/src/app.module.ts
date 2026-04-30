@@ -20,6 +20,7 @@ import { DonorModule } from './donors/donor.module';
 import { AuditModule } from './audit/audit.module';
 import { InvestmentModule } from './investment/investment.module';
 import { RiskModule } from './risk/risk.module';
+import { DisbursementsModule } from './disbursements/disbursements.module';
 
 @Module({
   imports: [
@@ -52,6 +53,7 @@ import { RiskModule } from './risk/risk.module';
     AuditModule,
     InvestmentModule,
     RiskModule,
+    DisbursementsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
