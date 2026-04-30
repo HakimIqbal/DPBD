@@ -210,20 +210,34 @@ Dispatcher: [`frontend/app/admin/page.tsx`](frontend/app/admin/page.tsx) — mat
 
 ## Test accounts (dev only)
 
-Akun ini auto-tersedia di environment dev (sudah di-seed atau dibuat via skrip). **Jangan pakai di production.** Rotate password CEO segera setelah first-start production.
+Untuk demo dashboard per role, ada 5 test account yang dibuat oleh script (CFO, Investment Manager, Risk Manager, Dewan Pembina, Dewan Pengawas) plus admin biasa & CEO yang auto-bootstrap.
 
-| Role | Email | Password |
-|---|---|---|
-| CEO (auto-bootstrap) | `ceo@dpbd.org` | `ChangeMe123!` |
-| Admin | `admintest@example.com` | `adminpass1` |
-| CFO | `cfo-test@example.com` | `cfopass1` |
-| Investment Manager | `im-test@example.com` | `impass1` |
-| Risk Manager | `risk-test@example.com` | `riskpass1` |
-| Dewan Pembina | `pembina-test@example.com` | `pembinapass1` |
-| Dewan Pengawas | `pengawas-test@example.com` | `pengawaspass1` |
-| Donor (personal) | `smoketest@example.com` | (ada di seed asli) |
+**Password tidak ditulis di repo ini.** Setiap dev tarik nilainya dari channel internal (Slack `#dpbd-dev`, password manager tim, atau tanya teammate). Lalu set di `backend/.env` lokal:
 
-CEO password bisa di-override via `CEO_BOOTSTRAP_PASSWORD` env sebelum first start. Detail lengkap: [ROLES.md §3](backend/ROLES.md).
+```env
+CEO_BOOTSTRAP_PASSWORD=<dari teammate>
+TEST_USERS_PASSWORD=<dari teammate>
+```
+
+**Generate test users (sekali setelah set env):**
+```bash
+cd backend
+npx ts-node src/scripts/seed-test-users.ts
+```
+
+Akun yang dibuat (semua pakai `TEST_USERS_PASSWORD`):
+
+| Role | Email |
+|---|---|
+| CFO | `cfo-test@example.com` |
+| Investment Manager | `im-test@example.com` |
+| Risk Manager | `risk-test@example.com` |
+| Dewan Pembina | `pembina-test@example.com` |
+| Dewan Pengawas | `pengawas-test@example.com` |
+
+CEO `ceo@dpbd.org` di-create oleh bootstrap saat first server start (pakai `CEO_BOOTSTRAP_PASSWORD`). Idempotent — setelah ada, env-nya diabaikan. Rotate password CEO via `PATCH /api/users/profile` segera setelah login pertama, terutama di production.
+
+> ⚠️ **Jangan commit password apapun ke repo.** Script `seed-test-users.ts` akan refuse to run kalau `TEST_USERS_PASSWORD` kosong. Detail rotation + manual CEO bootstrap: [ROLES.md §3](backend/ROLES.md).
 
 ---
 
@@ -275,10 +289,13 @@ DATABASE_NAME=postgres
 JWT_SECRET=dev-secret-min-32-chars-replace-in-production
 JWT_REFRESH_SECRET=dev-refresh-secret-min-32-chars
 
-# CEO bootstrap
+# CEO bootstrap (set value sebelum first server start)
 CEO_BOOTSTRAP_EMAIL=ceo@dpbd.org
-CEO_BOOTSTRAP_PASSWORD=ChangeMe123!     # ⚠️ ganti sebelum production
+CEO_BOOTSTRAP_PASSWORD=                 # required; minta dari teammate
 CEO_BOOTSTRAP_NAME=CEO DPBD
+
+# Test user seed (dev only — buat 5 test akun via script)
+TEST_USERS_PASSWORD=                    # required untuk seed-test-users.ts
 ```
 
 Optional (default sudah cukup untuk dev):

@@ -139,16 +139,20 @@ admin-gated `POST /api/admin/users/create` endpoint. The CEO is the
 "chicken-and-egg" account that breaks the loop: every other org account is
 created by an admin or CEO, and the CEO is created by bootstrap.
 
-**Auto-bootstrap (default, dev-friendly).** On every server start, the
-seed [`backend/src/seeds/bootstrap.seed.ts`](src/seeds/bootstrap.seed.ts)
-checks for any user with `role='ceo'`. If none exists, it creates one
-using these env vars (defaults shown):
+**Auto-bootstrap (default).** On every server start, the seed
+[`backend/src/seeds/bootstrap.seed.ts`](src/seeds/bootstrap.seed.ts)
+checks for any user with `role='ceo'`. If none exists AND
+`CEO_BOOTSTRAP_PASSWORD` is set in env (≥8 chars), it creates one:
 
 ```
-CEO_BOOTSTRAP_EMAIL=ceo@dpbd.org
-CEO_BOOTSTRAP_PASSWORD=ChangeMe123!
-CEO_BOOTSTRAP_NAME=CEO DPBD
+CEO_BOOTSTRAP_EMAIL=ceo@dpbd.org    # default if unset
+CEO_BOOTSTRAP_PASSWORD=             # required — fail-closed, no default
+CEO_BOOTSTRAP_NAME=CEO DPBD         # default if unset
 ```
+
+If the password env is missing or too short, the seed logs a warning
+and skips silently — no fallback to a hardcoded value, because that's
+exactly the pattern credential scanners (GitGuardian etc.) flag.
 
 The bootstrap is **idempotent** — once a CEO exists, every subsequent
 start skips the seed silently. It also refuses to clobber an existing
@@ -168,23 +172,24 @@ npx ts-node src/scripts/create-ceo.ts
 It reads the same env vars and the same idempotent logic. Exits 0 on
 success or no-op, non-zero only on DB/hashing errors.
 
-**Changing CEO credentials after bootstrap.** The default password
-(`ChangeMe123!`) is intentionally weak so you can sign in once. Rotate it
-immediately:
+**Changing CEO credentials after bootstrap.** The bootstrap password is
+whatever you set in `CEO_BOOTSTRAP_PASSWORD` — coordinate that value
+through a real channel (password manager, signed Slack DM), never via
+the codebase. Rotate after first login:
 
 1. Log in as the bootstrapped CEO.
-2. `PATCH /api/users/profile` (or the admin UI's profile page) with a new
-   strong password.
+2. `PATCH /api/users/profile` (or the admin UI's profile page) with a
+   new strong password.
 3. To rename or move the email, an existing admin/CEO can use
    `PATCH /api/users/:id` against the bootstrapped account.
 
 To re-bootstrap from scratch (e.g. after wiping users), set new values in
 `.env` and either restart the server or run the standalone script.
 
-> ⚠️ **Production warning:** never deploy with the default
-> `CEO_BOOTSTRAP_PASSWORD`. Override it via env *before* first start, then
-> have the CEO change it again right after first login. The default exists
-> only so a zero-config dev environment Just Works.
+> ⚠️ **Production warning:** set `CEO_BOOTSTRAP_PASSWORD` *before* first
+> start with a strong, single-use value, then have the CEO rotate it
+> immediately after first login. Never embed the value in source, in a
+> committed `.env`, or in any documentation that ships with the repo.
 
 ### Bootstrapping additional admins
 

@@ -7,11 +7,13 @@ import { User, AuditLog } from '../entities';
  * sign in immediately without touching SQL. Idempotent — if any user with
  * role='ceo' exists this is a no-op.
  *
- * Credentials come from env (CEO_BOOTSTRAP_EMAIL / _PASSWORD / _NAME) with
- * sane defaults so the function still works in zero-config dev. The
- * defaults are intentionally weak; production deployments MUST override
- * them via env or the standalone script (`scripts/create-ceo.ts`) and
- * rotate the password immediately after first login.
+ * Credentials come from env vars (CEO_BOOTSTRAP_EMAIL / _PASSWORD /
+ * _NAME). Email and name fall back to defaults; password does NOT — if
+ * `CEO_BOOTSTRAP_PASSWORD` is unset, the seed logs a warning and skips
+ * bootstrap entirely. Hardcoded default passwords in source are exactly
+ * what credential scanners flag; fail-closed forces the operator to set
+ * a real value via env (or the standalone CLI), and rotate it again
+ * after first login.
  *
  * Writes a single audit log entry (`CEO_BOOTSTRAP` / entityType `User`)
  * with `actorId=null` since no one is authenticated at bootstrap time.
@@ -30,8 +32,17 @@ export async function bootstrapCEO(dataSource: DataSource): Promise<void> {
   }
 
   const email = process.env.CEO_BOOTSTRAP_EMAIL || 'ceo@dpbd.org';
-  const password = process.env.CEO_BOOTSTRAP_PASSWORD || 'ChangeMe123!';
+  const password = process.env.CEO_BOOTSTRAP_PASSWORD;
   const name = process.env.CEO_BOOTSTRAP_NAME || 'CEO DPBD';
+
+  if (!password || password.trim().length < 8) {
+    console.warn(
+      '[Bootstrap] ⚠️  CEO_BOOTSTRAP_PASSWORD is not set (or shorter than 8 chars). ' +
+        'Skipping CEO bootstrap. Set it in backend/.env (gitignored) and restart, ' +
+        'or run `npx ts-node src/scripts/create-ceo.ts` after setting the env.',
+    );
+    return;
+  }
 
   // Edge case: somebody could have an account at this email under a
   // different role (admin promoted via SQL, for example). Don't clobber —
